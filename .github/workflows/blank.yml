@@ -12,11 +12,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout repo
-      - name: Checkout code
+      # 1. Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Setup Java
+      # 2. Setup Java 17
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -24,19 +24,44 @@ jobs:
           distribution: "temurin"
           cache: maven
 
-      # 3. Build (IMPORTANT: correct folder)
-      - name: Build project
-        working-directory: springbootexample
+      # 3. Build project (FIXED PATH)
+      - name: Build Maven project
+        working-directory: ./springbootexample
         run: mvn clean package -DskipTests
 
       # 4. Run tests
       - name: Run tests
-        working-directory: springbootexample
+        working-directory: ./springbootexample
         run: mvn test
 
-      # 5. Upload JAR for deployment
-      - name: Upload artifact
+      # 5. Upload JAR file
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: springboot-app
           path: springbootexample/target/*.jar
+
+
+  deploy:
+    needs: build-test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: springboot-app
+
+      # -----------------------------
+      # OPTION A: DEPLOY TO EC2 (REAL DEPLOYMENT)
+      # -----------------------------
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ubuntu/app
+            pkill -f 'java -jar' || true
+            nohup java -jar *.jar > app.log 2>&1 &
